@@ -1,0 +1,262 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUDO STAR</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#101522;color:white;
+ font-family:Arial,sans-serif;text-align:center;
+}
+header{padding:18px;background:#171f30}
+h1{margin:0;color:#ffd34e;letter-spacing:3px}
+header p{color:#aab4c8;margin:8px 0 0}
+.game{max-width:520px;margin:auto;padding:14px}
+.info{
+ display:flex;justify-content:space-between;
+ background:#202b40;padding:13px;border-radius:14px;
+ margin-bottom:14px;font-weight:bold
+}
+.board{
+ display:grid;grid-template-columns:repeat(15,1fr);
+ grid-template-rows:repeat(15,1fr);
+ aspect-ratio:1;background:#fff;
+ border:4px solid #e4e8f0;border-radius:10px;
+ overflow:hidden;gap:1px
+}
+.cell{background:#f0f2f6;position:relative}
+.track{background:#fff;border:1px solid #d7dce5}
+.red{background:#ef4444}
+.blue{background:#3988ff}
+.green{background:#22b66a}
+.yellow{background:#f4c542}
+.base{
+ display:flex;align-items:center;justify-content:center;
+ border:3px solid white
+}
+.home{
+ width:78%;height:78%;background:white;border-radius:15%;
+ display:grid;grid-template-columns:1fr 1fr;
+ place-items:center;gap:4px;padding:5px
+}
+.piece{
+ width:75%;aspect-ratio:1;border-radius:50%;
+ border:3px solid white;box-shadow:0 2px 5px #555;
+ cursor:pointer;display:flex;align-items:center;
+ justify-content:center;font-size:10px;color:white
+}
+.center{
+ background:conic-gradient(#ef4444 0 25%,#3988ff 0 50%,#f4c542 0 75%,#22b66a 0);
+}
+button{
+ border:0;border-radius:13px;padding:14px 22px;
+ font-size:17px;font-weight:bold;cursor:pointer;
+}
+#roll{background:#ffd34e;color:#171717;margin-top:17px}
+#roll:disabled{opacity:.4}
+#dice{font-size:35px;margin:12px}
+#message{color:#ffd34e;min-height:24px;margin:12px}
+.players{
+ display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px
+}
+.player{padding:12px;border-radius:12px;background:#202b40}
+.player.active{outline:3px solid #ffd34e}
+footer{color:#8792a8;font-size:12px;padding:18px}
+</style>
+</head>
+<body>
+<header>
+<h1>🎲 LUDO STAR</h1>
+<p>THE ULTIMATE LUDO GAME</p>
+</header>
+
+<div class="game">
+<div class="info">
+<span>👑 LUDO STAR</span>
+<span id="turn">دور الأحمر</span>
+</div>
+
+<div class="board" id="board"></div>
+
+<div id="dice">🎲</div>
+<div id="message">اضغط على النرد لبدء اللعب</div>
+<button id="roll" onclick="rollDice()">ارمِ النرد 🎲</button>
+
+<div class="players" id="players">
+<div class="player active">🔴 الأحمر</div>
+<div class="player">🔵 الأزرق</div>
+<div class="player">🟢 الأخضر</div>
+<div class="player">🟡 الأصفر</div>
+</div>
+</div>
+<footer>© 2026 LUDO STAR</footer>
+
+<script>
+const colors=['red','blue','green','yellow'];
+const names=['الأحمر','الأزرق','الأخضر','الأصفر'];
+const emojis=['🔴','🔵','🟢','🟡'];
+
+const board=document.getElementById('board');
+const track=[];
+
+// مسار دائري من 52 خانة
+for(let c=1;c<=13;c++)track.push([1,c]);
+for(let r=2;r<=13;r++)track.push([r,13]);
+for(let c=12;c>=1;c--)track.push([13,c]);
+for(let r=12;r>=2;r--)track.push([r,1]);
+
+const bases=[
+ {r:2,c:2,color:'red'},
+ {r:2,c:10,color:'blue'},
+ {r:10,c:2,color:'green'},
+ {r:10,c:10,color:'yellow'}
+];
+
+const pieces=colors.map(()=>Array(4).fill(-1));
+let player=0,dice=0,rolling=false;
+
+function makeBoard(){
+ board.innerHTML='';
+ for(let r=0;r<15;r++){
+  for(let c=0;c<15;c++){
+   let el=document.createElement('div');
+   el.className='cell';
+   el.id=`cell-${r}-${c}`;
+   board.appendChild(el);
+  }
+ }
+ track.forEach(([r,c])=>{
+  document.getElementById(`cell-${r}-${c}`).classList.add('track');
+ });
+ bases.forEach(b=>{
+  let el=document.getElementById(`cell-${b.r}-${b.c}`);
+  el.className='cell base '+b.color;
+  el.style.gridRow=`${b.r+1}/span 4`;
+  el.style.gridColumn=`${b.c+1}/span 4`;
+  el.innerHTML=`<div class="home">
+   ${[0,1,2,3].map(i=>`<div class="piece ${b.color}" style="width:75%"></div>`).join('')}
+  </div>`;
+ });
+ let center=document.getElementById('cell-7-7');
+ center.className='cell center';
+ center.style.gridRow='7/span 3';
+ center.style.gridColumn='7/span 3';
+ renderPieces();
+}
+
+function renderPieces(){
+ document.querySelectorAll('.token').forEach(e=>e.remove());
+ pieces.forEach((group,p)=>{
+  group.forEach((pos,i)=>{
+   let r,c;
+   if(pos===-1){
+    const base=bases[p];
+    const spots=[
+     [base.r+1,base.c+1],
+     [base.r+1,base.c+2],
+     [base.r+2,base.c+1],
+     [base.r+2,base.c+2]
+    ];
+    [r,c]=spots[i];
+   }else if(pos>=52){
+    return;
+   }else{
+    let index=(pos+p*13)%52;
+    [r,c]=track[index];
+   }
+   let el=document.createElement('button');
+   el.className='piece token '+colors[p];
+   el.innerText=i+1;
+   el.style.position='absolute';
+   el.style.width='85%';
+   el.style.height='85%';
+   el.style.left='7%';
+   el.style.top='7%';
+   el.style.padding='0';
+   el.style.zIndex=5;
+   el.onclick=()=>movePiece(p,i);
+   document.getElementById(`cell-${r}-${c}`).appendChild(el);
+  });
+ });
+}
+
+function rollDice(){
+ if(rolling)return;
+ if(dice!==0){
+  document.getElementById('message').innerText='حرّك قطعة أو انتظر تبديل الدور';
+  return;
+ }
+ rolling=true;
+ document.getElementById('roll').disabled=true;
+ let count=0;
+ let timer=setInterval(()=>{
+  dice=Math.ceil(Math.random()*6);
+  document.getElementById('dice').innerText=
+   ['','⚀','⚁','⚂','⚃','⚄','⚅'][dice];
+  count++;
+  if(count>=10){
+   clearInterval(timer);
+   rolling=false;
+   document.getElementById('roll').disabled=false;
+   if(!pieces[player].some(x=>x===-1)&&dice!==6){
+    document.getElementById('message').innerText='لم تحصل على 6، الدور التالي';
+    setTimeout(nextPlayer,1000);
+   }else{
+    document.getElementById('message').innerText=
+     dice===6?'ممتاز! اختر قطعة لتحريكها':'اختر القطعة التي تريد تحريكها';
+   }
+  }
+ },90);
+}
+
+function movePiece(p,i){
+ if(p!==player||dice===0||rolling)return;
+ let current=pieces[p][i];
+ if(current===-1){
+  if(dice!==6){
+   document.getElementById('message').innerText='تحتاج إلى رقم 6 لإخراج القطعة';
+   return;
+  }
+  pieces[p][i]=0;
+ }else{
+  pieces[p][i]+=dice;
+  if(pieces[p][i]>57){
+   pieces[p][i]=57;
+  }
+ }
+ let finished=pieces[p].filter(x=>x===57).length;
+ renderPieces();
+ if(finished===4){
+  document.getElementById('message').innerText='🏆 فاز '+names[p]+'!';
+  document.getElementById('roll').disabled=true;
+  return;
+ }
+ let extra=dice===6;
+ dice=0;
+ document.getElementById('dice').innerText='🎲';
+ if(extra){
+  document.getElementById('message').innerText='🎉 حصلت على 6! العب مرة أخرى';
+ }else{
+  nextPlayer();
+ }
+}
+
+function nextPlayer(){
+ player=(player+1)%4;
+ dice=0;
+ document.getElementById('dice').innerText='🎲';
+ document.getElementById('turn').innerText='دور '+names[player];
+ document.getElementById('message').innerText='دور '+names[player]+'، ارمِ النرد';
+ document.querySelectorAll('.player').forEach((el,i)=>{
+  el.classList.toggle('active',i===player);
+ });
+ document.getElementById('roll').disabled=false;
+}
+
+makeBoard();
+</script>
+</body>
+</html>
